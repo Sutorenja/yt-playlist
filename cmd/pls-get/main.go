@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"playlist/pls"
 )
 
@@ -28,13 +29,20 @@ func main() {
 	// https://www.youtube.com/playlist?list=WL
 	// https://www.youtube.com/playlist?list=PLA9DML3OBu8nAICrUUCYTkELNoyMPzv2m
 
+	log.SetOutput(os.Stderr)
+
 	// TODO define flags here...
+	quiet := flag.Bool("quiet", false, "print info to stderr")
 
 	flag.Parse()
 
 	playlistFile := flag.Arg(0)
 	if playlistFile == "" {
 		log.Fatal("no playlist file listed")
+	}
+
+	if *quiet {
+		log.SetOutput(nil)
 	}
 
 	playlist, err := pls.DownloadPlaylist(playlistFile)
