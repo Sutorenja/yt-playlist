@@ -138,10 +138,7 @@ type Playlist struct {
 	Entries []Video `json:"entries"`
 }
 
-// just create a func that does all the DB stuff
-// and we can just call that func (it returns DB and err)
-// and check for err rq, then we have a DB we can use!
-// its a bit boilerplate-y but its fine
+// simple func that does all the DB stuff
 func DB(fn string) (*gorm.DB, error) {
 	db, err := gorm.Open(sqlite.Open(fn), &gorm.Config{})
 	if err != nil {
