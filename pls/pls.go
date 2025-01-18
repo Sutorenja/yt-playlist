@@ -87,11 +87,11 @@ type Video struct {
 
 	// video categories
 	// e.g. ["Entertainment", "Gaming"]
-	Categories []string `json:"categories"`
+	Categories []string `json:"categories" gorm:"serializer:json"`
 
 	// user defined video tags
 	// its just a list of user defined strings
-	Tags []string `json:"tags"`
+	Tags []string `json:"tags" gorm:"serializer:json"`
 
 	// video length
 	// e.g. 447
@@ -128,7 +128,7 @@ type Playlist struct {
 	Description string `json:"description"`
 
 	// list of user defined tags
-	Tags []string `json:"tags"`
+	Tags []string `json:"tags" gorm:"serializer:json"`
 
 	// number of videos in the playlist
 	Count int `json:"playlist_count"`
@@ -172,7 +172,7 @@ func DownloadPlaylist(playlistUrl string) (*Playlist, error) {
 	args := []string{playlistUrl, "-J", "--verbose", "-q", "--ignore-no-formats-error"}
 	ytdlp := exec.Command("yt-dlp", args...)
 	ytdlp.Stderr = os.Stderr
-	
+
 	stdout, err := ytdlp.Output()
 	if err != nil {
 		return nil, err
