@@ -3,10 +3,9 @@ package pls
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/url"
-	"strings"
-	"time"
 
 	"github.com/go-cmd/cmd"
 	"gorm.io/driver/sqlite"
@@ -169,29 +168,49 @@ func DownloadPlaylist(playlistUrl string) (*Playlist, error) {
 
 	// TODO enable --no-warnings flag??
 	// TODO cookies "--cookies-from-browser", "firefox"
-	ytdlp := cmd.NewCmd("yt-dlp", playlistUrl, "-J", "--verbose", "-q", "--ignore-no-formats-error")
-	stdout := ytdlp.Start()
-	ticker := time.NewTicker(1 * time.Second)
+
+	opts := cmd.Options{Buffered: false, Streaming: true}
+	args := []string{playlistUrl, "-J", "--verbose", "-q", "--ignore-no-formats-error"}
+	ytdlp := cmd.NewCmdOptions(opts, "yt-dlp", args...)
+	out := ""
+	done := make(chan struct{})
 
 	go func() {
-		i := 0
-		for range ticker.C {
-			status := ytdlp.Status()
-			n := len(status.Stderr)
-			log.Println(strings.Join(status.Stderr[i:n], "\n"))
-			i = n
+		defer close(done)
+
+		// run as long as either of them have input
+		for ytdlp.Stdout != nil || ytdlp.Stderr != nil {
+			// select waits for one of the cases to be true
+			select {
+			case line, open := <-ytdlp.Stdout:
+				if !open {
+					ytdlp.Stdout = nil
+					continue
+				}
+				out += line
+			case line, open := <-ytdlp.Stderr:
+				if !open {
+					ytdlp.Stderr = nil
+					continue
+				}
+				log.Println(line)
+			}
 		}
 	}()
 
-	data := (<-stdout).Stdout
-	str := strings.Join(data, "")
-	return UnmarshalPlaylist([]byte(str))
+	<-ytdlp.Start()
+	<-done
+
+	fmt.Printf("out: %v\n", out)
+
+	return UnmarshalPlaylist([]byte(out))
 }
 
 func UnmarshalPlaylist(data []byte) (*Playlist, error) {
 	var playlist Playlist
 	err := json.Unmarshal(data, &playlist)
 	if err != nil {
+		log.Println("JSON ERROR????")
 		return nil, err
 	}
 	return &playlist, nil
