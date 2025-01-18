@@ -158,7 +158,7 @@ func DB(fn string) (*gorm.DB, error) {
 
 // https://www.reddit.com/r/youtubedl/wiki/cookies
 func DownloadPlaylist(playlistUrl string) (*Playlist, error) {
-	err := ValidateUrl(playlistUrl)
+	err := ValidatePlaylistUrl(playlistUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +197,7 @@ func UnmarshalPlaylist(data []byte) (*Playlist, error) {
 	return &playlist, nil
 }
 
-func ValidateUrl(rawUrl string) error {
+func ValidatePlaylistUrl(rawUrl string) error {
 	url, err := url.Parse(rawUrl)
 	if err != nil {
 		return err
@@ -205,7 +205,7 @@ func ValidateUrl(rawUrl string) error {
 	if url.Scheme != "https" {
 		return errors.New("expected https")
 	}
-	if url.Hostname() != "youtube.com" {
+	if url.Hostname() != "youtube.com" && url.Hostname() != "www.youtube.com" {
 		return errors.New("not a youtube url")
 	}
 	if url.Path != "/playlist" {
