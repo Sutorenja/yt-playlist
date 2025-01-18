@@ -2,9 +2,13 @@ package pls
 
 import (
 	"encoding/json"
-	"os"
-	"os/exec"
+	"errors"
+	"log"
+	"net/url"
+	"strings"
+	"time"
 
+	"github.com/go-cmd/cmd"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -154,27 +158,61 @@ func DB(fn string) (*gorm.DB, error) {
 
 // https://www.reddit.com/r/youtubedl/wiki/cookies
 func DownloadPlaylist(playlistUrl string) (*Playlist, error) {
-	// TODO sanitate playlistUrl
-	// make sure its actually a valid url
-	// by running it through net/url?
+	err := ValidateUrl(playlistUrl)
+	if err != nil {
+		return nil, err
+	}
 
 	// TODO
 	// launch firefox with a youtube tab open?
 	// (you can close it later)
 
-	cmd := exec.Command("yt-dlp", playlistUrl, "-J" /*, "--cookies-from-browser", "firefox"*/) // TODO cookies
-	cmd.Stderr = os.Stderr
+	// TODO enable --no-warnings flag??
+	// TODO cookies "--cookies-from-browser", "firefox"
+	ytdlp := cmd.NewCmd("yt-dlp", playlistUrl, "-J", "--verbose", "-q", "--ignore-no-formats-error")
+	stdout := ytdlp.Start()
+	ticker := time.NewTicker(1 * time.Second)
 
-	stdout, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
+	go func() {
+		i := 0
+		for range ticker.C {
+			status := ytdlp.Status()
+			n := len(status.Stderr)
+			log.Println(strings.Join(status.Stderr[i:n], "\n"))
+			i = n
+		}
+	}()
 
+	data := (<-stdout).Stdout
+	str := strings.Join(data, "")
+	return UnmarshalPlaylist([]byte(str))
+}
+
+func UnmarshalPlaylist(data []byte) (*Playlist, error) {
 	var playlist Playlist
-
-	err = json.Unmarshal(stdout, &playlist)
+	err := json.Unmarshal(data, &playlist)
 	if err != nil {
 		return nil, err
 	}
 	return &playlist, nil
+}
+
+func ValidateUrl(rawUrl string) error {
+	url, err := url.Parse(rawUrl)
+	if err != nil {
+		return err
+	}
+	if url.Scheme != "https" {
+		return errors.New("expected https")
+	}
+	if url.Hostname() != "youtube.com" {
+		return errors.New("not a youtube url")
+	}
+	if url.Path != "/playlist" {
+		return errors.New("not a playlist url")
+	}
+	if !url.Query().Has("list") {
+		return errors.New("no playlist id in url")
+	}
+	return nil
 }
