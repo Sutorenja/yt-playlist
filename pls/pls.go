@@ -1,13 +1,18 @@
 package pls
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"image"
 	"log"
 	"net/url"
 	"os"
 	"os/exec"
 
+	"github.com/carlmjohnson/requests"
+	"github.com/mattn/go-sixel"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -245,4 +250,50 @@ func (p *VideoPaginator) Prev() {
 	if p.PageIndex < p.MinIndex {
 		p.PageIndex = p.MinIndex
 	}
+}
+
+type SixelImage struct {
+	width  int // width in pixels
+	height int // height in pixels
+	data   *bytes.Buffer
+}
+
+func NewSixelImage(img image.Image) (SixelImage, error) {
+	var buf bytes.Buffer
+	enc := sixel.NewEncoder(&buf)
+	if err := enc.Encode(img); err != nil {
+		return SixelImage{}, err
+	}
+	return SixelImage{
+		width:  img.Bounds().Dx(),
+		height: img.Bounds().Dy(),
+		data:   &buf,
+	}, nil
+}
+
+// Replace with func that downloads thumbnail
+// that func can just return imageData tbh
+// OR "sixelImage"
+func DownloadThumbnail(thumbnailUrl string) (image.Image, error) {
+	var buf bytes.Buffer
+	if err := requests.
+		URL(thumbnailUrl).
+		ToBytesBuffer(&buf).
+		Fetch(context.Background()); err != nil {
+		return nil, err
+	}
+	img, _, err := image.Decode(&buf)
+	return img, err
+}
+
+func SixelThumbnail(thumbnailUrl string) (SixelImage, error) {
+	thumbnail, err := DownloadThumbnail(thumbnailUrl)
+	if err != nil {
+		return SixelImage{}, err
+	}
+	img, err := NewSixelImage(thumbnail)
+	if err != nil {
+		return SixelImage{}, err
+	}
+	return img, nil
 }
