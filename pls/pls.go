@@ -215,40 +215,86 @@ func ValidatePlaylistUrl(rawUrl string) error {
 	return nil
 }
 
-// TODO instead of pages
-// we want a natural scroll
-// so when you click DOWN_ARROW
-// it goes one video down
-// so we offset it by 1
-type VideoPaginator struct {
-	DB         *gorm.DB
-	PageNumber int
-	PageIndex  int
-	MinIndex   int
-	MaxIndex   int
+// TODO rename?
+// the struct contains the data used to display parts of a playlist
+// it effectively is a paginator...
+type PlaylistPaginator struct {
+	DB *gorm.DB
+
+	// number of videos on a given page
+	// e.g 10
+	PageSize int
+
+	// between 0 and PageSize-1
+	SelectedIndex int
+
+	// number of videos in the playlist
+	PlaylistSize int
+
+	// used in SQL queries for pagination
+	offset int
 }
 
-// page is page index
-func (p *VideoPaginator) GetCurrentPage() ([]Video, error) {
+func (p *PlaylistPaginator) GetCurrentPage() ([]Video, error) {
 	var videos []Video
 	result := p.DB.Order("created_at").
-		Limit(p.PageNumber).
-		Offset(p.PageNumber * p.PageIndex).
+		Limit(p.PageSize).
+		Offset(p.offset).
 		Find(&videos)
 	return videos, result.Error
 }
 
-func (p *VideoPaginator) Next() {
-	p.PageIndex++
-	if p.PageIndex > p.MaxIndex {
-		p.PageIndex = p.MaxIndex
+// we only want to change the offset when we have the first or last element selected
+// e.g.
+// a
+// b
+// c
+// d
+// [e]
+
+// in this example 'e' is selected
+// if we increment the index
+// we want to change the offset by 1 and show the next element 'f' (and select it)
+
+// b
+// c
+// d
+// e
+// [f]
+
+// but if we now decrement the selected index by 1
+// we want it to look like this:
+// b
+// c
+// d
+// [e]
+// f
+
+// not like this:
+// a
+// b
+// c
+// d
+// [e]
+
+// so Offset and SelectedIndex must be separate (but they are often the same!)
+
+func (p *PlaylistPaginator) Next() {
+	if p.SelectedIndex+1 > p.PageSize-1 {
+		p.offset++
+	} else {
+		p.SelectedIndex++
 	}
 }
 
-func (p *VideoPaginator) Prev() {
-	p.PageIndex--
-	if p.PageIndex < p.MinIndex {
-		p.PageIndex = p.MinIndex
+func (p *PlaylistPaginator) Prev() {
+	if p.SelectedIndex-1 < 0 {
+		p.offset--
+		if p.offset < 0 {
+			p.offset = 0
+		}
+	} else {
+		p.SelectedIndex--
 	}
 }
 
