@@ -209,3 +209,40 @@ func ValidatePlaylistUrl(rawUrl string) error {
 	}
 	return nil
 }
+
+// TODO instead of pages
+// we want a natural scroll
+// so when you click DOWN_ARROW
+// it goes one video down
+// so we offset it by 1
+type VideoPaginator struct {
+	DB         *gorm.DB
+	PageNumber int
+	PageIndex  int
+	MinIndex   int
+	MaxIndex   int
+}
+
+// page is page index
+func (p *VideoPaginator) GetCurrentPage() ([]Video, error) {
+	var videos []Video
+	result := p.DB.Order("created_at").
+		Limit(p.PageNumber).
+		Offset(p.PageNumber * p.PageIndex).
+		Find(&videos)
+	return videos, result.Error
+}
+
+func (p *VideoPaginator) Next() {
+	p.PageIndex++
+	if p.PageIndex > p.MaxIndex {
+		p.PageIndex = p.MaxIndex
+	}
+}
+
+func (p *VideoPaginator) Prev() {
+	p.PageIndex--
+	if p.PageIndex < p.MinIndex {
+		p.PageIndex = p.MinIndex
+	}
+}
