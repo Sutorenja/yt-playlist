@@ -244,41 +244,6 @@ func (p *PlaylistPaginator) GetCurrentPage() ([]Video, error) {
 	return videos, result.Error
 }
 
-// we only want to change the offset when we have the first or last element selected
-// e.g.
-// a
-// b
-// c
-// d
-// [e]
-
-// in this example 'e' is selected
-// if we increment the index
-// we want to change the offset by 1 and show the next element 'f' (and select it)
-
-// b
-// c
-// d
-// e
-// [f]
-
-// but if we now decrement the selected index by 1
-// we want it to look like this:
-// b
-// c
-// d
-// [e]
-// f
-
-// not like this:
-// a
-// b
-// c
-// d
-// [e]
-
-// so Offset and SelectedIndex must be separate (but they are often the same!)
-
 func (p *PlaylistPaginator) Next() {
 	if p.SelectedIndex+1 > p.PageSize-1 {
 		p.offset++
