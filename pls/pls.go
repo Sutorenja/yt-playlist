@@ -264,9 +264,9 @@ func (p *PlaylistPaginator) Prev() {
 }
 
 type SixelImage struct {
-	width  int // width in pixels
-	height int // height in pixels
-	data   *bytes.Buffer
+	Width  int // width in pixels
+	Height int // height in pixels
+	Data   *bytes.Buffer
 }
 
 func NewSixelImage(img image.Image) (SixelImage, error) {
@@ -276,9 +276,9 @@ func NewSixelImage(img image.Image) (SixelImage, error) {
 		return SixelImage{}, err
 	}
 	return SixelImage{
-		width:  img.Bounds().Dx(),
-		height: img.Bounds().Dy(),
-		data:   &buf,
+		Width:  img.Bounds().Dx(),
+		Height: img.Bounds().Dy(),
+		Data:   &buf,
 	}, nil
 }
 
