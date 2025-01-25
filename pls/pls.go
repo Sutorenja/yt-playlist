@@ -1,18 +1,15 @@
 package pls
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
-	"image"
-	"log"
+	"io"
 	"net/url"
-	"os"
 	"os/exec"
+	"sort"
+	"strings"
 
-	"github.com/carlmjohnson/requests"
-	"github.com/mattn/go-sixel"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -21,12 +18,6 @@ type Channel struct {
 	// the name of the channel that uploaded the video
 	// e.g. Alydle
 	ChannelTitle string `json:"channel"` // "channel" is just the display name
-
-	// the follower count of the channel that uploaded the video
-	ChannelFollowerCount int `json:"channel_follower_count"`
-	// is null in structs...
-	// does that just set it to 0? think so
-	// TODO test it
 
 	// the id of the channel that uploaded the video
 	// e.g. UCueMs7IubhfQm3jXMc0NYOw
@@ -161,22 +152,16 @@ func DB(fn string) (*gorm.DB, error) {
 }
 
 // https://www.reddit.com/r/youtubedl/wiki/cookies
-func DownloadPlaylist(playlistUrl string) (*Playlist, error) {
+func DownloadPlaylist(playlistUrl string, logger io.Writer) (*Playlist, error) {
 	err := ValidatePlaylistUrl(playlistUrl)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO
-	// launch firefox with a youtube tab open?
-	// (you can close it later)
-
-	// TODO enable --no-warnings flag??
-	// TODO cookies "--cookies-from-browser", "firefox"
-
-	args := []string{playlistUrl, "-J", "--verbose", "-q", "--ignore-no-formats-error"}
+	// hardcoding firefox here is kinda bad, but i dont feel like changing it rn
+	args := []string{playlistUrl, "-J", "--verbose", "--flat-playlist", "--ignore-no-formats-error", "--cookies-from-browser", "firefox"}
 	ytdlp := exec.Command("yt-dlp", args...)
-	ytdlp.Stderr = os.Stderr
+	ytdlp.Stderr = logger
 
 	stdout, err := ytdlp.Output()
 	if err != nil {
@@ -189,7 +174,6 @@ func UnmarshalPlaylist(data []byte) (*Playlist, error) {
 	var playlist Playlist
 	err := json.Unmarshal(data, &playlist)
 	if err != nil {
-		log.Println("JSON ERROR????")
 		return nil, err
 	}
 	return &playlist, nil
@@ -215,96 +199,36 @@ func ValidatePlaylistUrl(rawUrl string) error {
 	return nil
 }
 
-// TODO rename?
-// the struct contains the data used to display parts of a playlist
-// it effectively is a paginator...
-type PlaylistPaginator struct {
-	DB *gorm.DB
+func FuzzyFind(query string, filter string, videos []Video) []Video {
+	var words []string
+	var word2video = make(map[string]Video)
+	query = strings.ToLower(query)
 
-	// number of videos on a given page
-	// e.g 10
-	PageSize int
-
-	// between 0 and PageSize-1
-	SelectedIndex int
-
-	// number of videos in the playlist
-	PlaylistSize int
-
-	// used in SQL queries for pagination
-	offset int
-}
-
-func (p *PlaylistPaginator) GetCurrentPage() ([]Video, error) {
-	var videos []Video
-	result := p.DB.Order("created_at").
-		Limit(p.PageSize).
-		Offset(p.offset).
-		Find(&videos)
-	return videos, result.Error
-}
-
-func (p *PlaylistPaginator) Next() {
-	if p.SelectedIndex+1 > p.PageSize-1 {
-		p.offset++
-	} else {
-		p.SelectedIndex++
-	}
-}
-
-func (p *PlaylistPaginator) Prev() {
-	if p.SelectedIndex-1 < 0 {
-		p.offset--
-		if p.offset < 0 {
-			p.offset = 0
+	for _, video := range videos {
+		// TODO proper error handling
+		word := ""
+		switch filter {
+		case "title":
+			word = strings.ToLower(video.Title)
+		case "desc":
+			word = strings.ToLower(video.Description)
+		case "channel":
+			word = strings.ToLower(video.ChannelTitle)
 		}
-	} else {
-		p.SelectedIndex--
+		word2video[word] = video
+		words = append(words, word)		
 	}
-}
 
-type SixelImage struct {
-	Width  int // width in pixels
-	Height int // height in pixels
-	Data   *bytes.Buffer
-}
+	matches := fuzzy.RankFind(query, words)
+	sort.Sort(matches)
 
-func NewSixelImage(img image.Image) (SixelImage, error) {
-	var buf bytes.Buffer
-	enc := sixel.NewEncoder(&buf)
-	if err := enc.Encode(img); err != nil {
-		return SixelImage{}, err
+	videos = []Video{}
+	for _, v := range matches {
+		video, ok := word2video[v.Target]
+		if !ok {
+			continue
+		}
+		videos = append(videos, video)
 	}
-	return SixelImage{
-		Width:  img.Bounds().Dx(),
-		Height: img.Bounds().Dy(),
-		Data:   &buf,
-	}, nil
-}
-
-// Replace with func that downloads thumbnail
-// that func can just return imageData tbh
-// OR "sixelImage"
-func DownloadThumbnail(thumbnailUrl string) (image.Image, error) {
-	var buf bytes.Buffer
-	if err := requests.
-		URL(thumbnailUrl).
-		ToBytesBuffer(&buf).
-		Fetch(context.Background()); err != nil {
-		return nil, err
-	}
-	img, _, err := image.Decode(&buf)
-	return img, err
-}
-
-func SixelThumbnail(thumbnailUrl string) (SixelImage, error) {
-	thumbnail, err := DownloadThumbnail(thumbnailUrl)
-	if err != nil {
-		return SixelImage{}, err
-	}
-	img, err := NewSixelImage(thumbnail)
-	if err != nil {
-		return SixelImage{}, err
-	}
-	return img, nil
+	return videos
 }

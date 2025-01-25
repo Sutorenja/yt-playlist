@@ -1,5 +1,12 @@
 package main
 
+import (
+	"log"
+	"playlist/cli"
+)
+
 func main() {
-	// tui
+	if err := cli.Run(); err != nil {
+		log.Fatal(err)
+	}
 }
