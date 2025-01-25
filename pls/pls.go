@@ -3,11 +3,13 @@ package pls
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"os/exec"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"gorm.io/driver/sqlite"
@@ -42,7 +44,7 @@ type Video struct {
 
 	// video id
 	// e.g. rlHBvH87G14
-	Id string `json:"id" gorm:"primaryKey"`
+	VideoId string `json:"id" gorm:"primaryKey"`
 
 	// video title
 	// e.g. 'Are We Living in the Gooner Gacha Age?'
@@ -53,7 +55,7 @@ type Video struct {
 	Description string `json:"description"`
 
 	// list of thumbnails in different resolutions
-	Thumbnails []Thumbnail `json:"thumbnails"`
+	Thumbnails []Thumbnail `json:"thumbnails" gorm:"serializer:json"`
 
 	// video view count
 	// e.g. 258948
@@ -186,4 +188,65 @@ func FuzzyFind(query string, filter string, videos []Video) []Video {
 		videos = append(videos, video)
 	}
 	return videos
+}
+
+func GetAllVideos(db *gorm.DB) ([]Video, error) {
+	// we can order by gorm.Model's CreatedAt (or ID alternatively)
+	// to get the "youtube" custom ordering (i.e. "sort by manual")
+	// use db.Order("created_at DESC").Find(&videos)
+	// actually i think that is the default order... so we dont have to do anything
+	var videos []Video
+	res := db.Find(&videos)
+	return videos, res.Error
+}
+
+func (video Video) BiggestThumbnail() Thumbnail {
+	biggest := Thumbnail{"", 0, 0}
+	for _, thumbnail := range video.Thumbnails {
+		area := thumbnail.Width * thumbnail.Height
+		areaBiggest := biggest.Width * biggest.Height
+
+		if area > areaBiggest {
+			biggest = thumbnail
+		}
+	}
+	return biggest
+}
+
+func (channel Channel) Url() string {
+	if channel.UploaderId != "" {
+		return "youtube.com/" + channel.UploaderId
+	}
+	return "youtube.com/channel/" + channel.ChannelId
+}
+
+func (video Video) Url() string {
+	return "youtube.com/watch?v=" + video.VideoId
+}
+
+// video length as a human-readable string
+// format: days:hours:minutes:seconds
+// days is not fixed length
+// all other are always 2 digits long
+// e.g. 1:00:00:00
+func (video Video) DurationString() string {
+	duration := time.Duration(video.Duration) * time.Second
+
+	hours := duration.Truncate(time.Hour)
+	duration = duration - hours
+
+	min := duration.Truncate(time.Minute)
+	duration = duration - min
+
+	days := int(hours.Hours() / 24)
+	hrs := int(hours.Hours() - float64(days * 24))
+
+	str := fmt.Sprintf("%02d:%02d", int(min.Minutes()), int(duration.Seconds()))
+	if days > 0 {
+		return fmt.Sprintf("%d:%02d:%s", days, hrs, str)
+	}
+	if hrs > 0 {
+		return fmt.Sprintf("%02d:%s", hrs, str)
+	}
+	return str
 }

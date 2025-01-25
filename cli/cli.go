@@ -85,9 +85,9 @@ var list = &cli.Command{
 			return err
 		}
 
-		var videos []pls.Video
-		if res := db.Find(&videos); res.Error != nil {
-			return res.Error
+		videos, err := pls.GetAllVideos(db)
+		if err != nil {
+			return err
 		}
 
 		if c.IsSet("query") {
@@ -104,10 +104,10 @@ var list = &cli.Command{
 			return pls.TUI(videos)
 		}
 
-		// print URLs???
+		// TODO print URLs???
 
 		for i, video := range videos {
-			fmt.Printf("%d: %v\n", i+1, video.Title)
+			fmt.Printf("%d: %v %s\n", i+1, video.Title, video.DurationString())
 		}
 
 		return nil
