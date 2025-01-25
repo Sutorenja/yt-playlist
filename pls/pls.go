@@ -14,20 +14,23 @@ import (
 	"gorm.io/gorm"
 )
 
-type Channel struct {
-	// the name of the channel that uploaded the video
-	// e.g. Alydle
-	ChannelTitle string `json:"channel"` // "channel" is just the display name
+type Thumbnail struct {
+	Url    string
+	Height int
+	Width  int
+}
 
-	// the id of the channel that uploaded the video
-	// e.g. UCueMs7IubhfQm3jXMc0NYOw
+type Channel struct {
+	// channel display name
+	// e.g. Mudan
+	ChannelTitle string `json:"channel"`
+
+	// channel id
+	// e.g. UCZTgg6AiQkSHtL5Jj0IO6MQ
 	ChannelId string `json:"channel_id"`
 
-	// url of the channel
-	// e.g. https://www.youtube.com/channel/UCueMs7IubhfQm3jXMc0NYOw
-	ChannelUrl string `json:"channel_url"`
-
-	// e.g. @Yehyeobbun
+	// channel id (new system)
+	// e.g. @Mudan
 	UploaderId string `json:"uploader_id"`
 }
 
@@ -39,74 +42,29 @@ type Video struct {
 
 	// video id
 	// e.g. rlHBvH87G14
-	Id string `json:"id" gorm:"primaryKey"` // TODO can a video be present multiple times in the playlist??? if so....  WAIT NO it cant.... phew
+	Id string `json:"id" gorm:"primaryKey"`
 
 	// video title
 	// e.g. 'Are We Living in the Gooner Gacha Age?'
 	Title string `json:"title"`
 
-	// video thumbnail
-	// e.g. 'https://i.ytimg.com/vi/rlHBvH87G14/maxresdefault.jpg'
-	Thumbnail string `json:"thumbnail"`
-
 	// video description
 	// can be of arbitrary length and contains line breaks
 	Description string `json:"description"`
+
+	// list of thumbnails in different resolutions
+	Thumbnails []Thumbnail `json:"thumbnails"`
 
 	// video view count
 	// e.g. 258948
 	ViewCount int `json:"view_count"`
 
-	// amount of comments on the video
-	// e.g. 405
-	CommentCount int `json:"comment_count"`
-
-	// amount of likes on the video
-	// e.g. 15847
-	LikeCount int `json:"like_count"`
-
-	// video url
-	// e.g. https://www.youtube.com/watch?v=rlHBvH87G14
-	VideoUrl string `json:"webpage_url"`
-
-	// video upload date
-	// e.g. 20200719
-	UploadDate string `json:"upload_date"`
-
-	// the exact timestamp the video was uploaded
-	// e.g. 1595133655
-	CreationTimestamp int `json:"timestamp"`
-
-	// video availability
-	// can be either "public", "private", or "unlisted"
-	Availability string `json:"availability"`
-
-	// video categories
-	// e.g. ["Entertainment", "Gaming"]
-	Categories []string `json:"categories" gorm:"serializer:json"`
-
-	// user defined video tags
-	// its just a list of user defined strings
-	Tags []string `json:"tags" gorm:"serializer:json"`
-
 	// video length
 	// e.g. 447
-	Duration int `json:"duration"`
-
-	// video length as a human-readable string
-	// e.g. "7:27"
-	DurationString string `json:"duration_string"`
-
-	// the index of the video when in a playlist
-	// this field is only present if the video was
-	// unmarshalled from a playlist url
-	PlaylistIndex int `json:"playlist_index,omitempty"`
+	Duration float64 `json:"duration"`
 }
 
 type Playlist struct {
-	// channel that created the playlist
-	Channel
-
 	// playlist id
 	// e.g. PLA9DML3OBu8nAICrUUCYTkELNoyMPzv2m
 	Id string `json:"id"`
@@ -122,9 +80,6 @@ type Playlist struct {
 	// playlist description
 	// can be of arbitrary length and contains line breaks
 	Description string `json:"description"`
-
-	// list of user defined tags
-	Tags []string `json:"tags" gorm:"serializer:json"`
 
 	// number of videos in the playlist
 	Count int `json:"playlist_count"`
@@ -216,7 +171,7 @@ func FuzzyFind(query string, filter string, videos []Video) []Video {
 			word = strings.ToLower(video.ChannelTitle)
 		}
 		word2video[word] = video
-		words = append(words, word)		
+		words = append(words, word)
 	}
 
 	matches := fuzzy.RankFind(query, words)
