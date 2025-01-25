@@ -64,7 +64,6 @@ var list = &cli.Command{
 	Description: "",
 	Usage:       "",
 	Flags: []cli.Flag{
-		&cli.StringFlag{Name: "filter", Aliases: []string{"f"}, Usage: "what to query over. Either 'title', 'desc', or 'channel'", Value: "title", Action: FilterFlag},
 		&cli.StringFlag{Name: "query", Aliases: []string{"q"}, Usage: "fuzzy search query"},
 		&cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative},
 		&cli.BoolFlag{Name: "tui", Aliases: []string{"t"}, Usage: "launch a tui and browse the result instead of printing it to stdout"},
@@ -91,7 +90,7 @@ var list = &cli.Command{
 		}
 
 		if c.IsSet("query") {
-			videos = pls.FuzzyFind(c.String("query"), c.String("filter"), videos)
+			videos = pls.FuzzyFind(c.String("query"), videos)
 		}
 
 		n := len(videos)
@@ -107,25 +106,11 @@ var list = &cli.Command{
 		// TODO print URLs???
 
 		for i, video := range videos {
-			fmt.Printf("%d: %v %s\n", i+1, video.Title, video.DurationString())
+			fmt.Printf("%d: %s\n", i+1, video.Title)
 		}
 
 		return nil
 	},
-}
-
-// make sure filter flag is appropriately set
-// TODO rename
-func FilterFlag(_ context.Context, _ *cli.Command, v string) error {
-	switch v {
-	case "title":
-		return nil
-	case "desc":
-		return nil
-	case "channel":
-		return nil
-	}
-	return fmt.Errorf("invalid filter")
 }
 
 // make sure int flag is not negative

@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os/exec"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/lithammer/fuzzysearch/fuzzy"
@@ -156,27 +155,16 @@ func ValidatePlaylistUrl(rawUrl string) error {
 	return nil
 }
 
-func FuzzyFind(query string, filter string, videos []Video) []Video {
+func FuzzyFind(query string, videos []Video) []Video {
 	var words []string
 	var word2video = make(map[string]Video)
-	query = strings.ToLower(query)
-
 	for _, video := range videos {
-		// TODO proper error handling
-		word := ""
-		switch filter {
-		case "title":
-			word = strings.ToLower(video.Title)
-		case "desc":
-			word = strings.ToLower(video.Description)
-		case "channel":
-			word = strings.ToLower(video.ChannelTitle)
-		}
+		word := fmt.Sprintf("%s %s", video.ChannelTitle, video.Title)
 		word2video[word] = video
 		words = append(words, word)
 	}
 
-	matches := fuzzy.RankFind(query, words)
+	matches := fuzzy.RankFindNormalizedFold(query, words)
 	sort.Sort(matches)
 
 	videos = []Video{}
@@ -239,7 +227,7 @@ func (video Video) DurationString() string {
 	duration = duration - min
 
 	days := int(hours.Hours() / 24)
-	hrs := int(hours.Hours() - float64(days * 24))
+	hrs := int(hours.Hours() - float64(days*24))
 
 	str := fmt.Sprintf("%02d:%02d", int(min.Minutes()), int(duration.Seconds()))
 	if days > 0 {
