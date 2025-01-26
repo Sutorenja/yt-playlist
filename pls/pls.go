@@ -1,15 +1,20 @@
 package pls
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
 	"io"
 	"net/url"
 	"os/exec"
 	"sort"
+	"strings"
 	"time"
 
+	"github.com/carlmjohnson/requests"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -109,7 +114,7 @@ func DB(fn string) (*gorm.DB, error) {
 
 // https://www.reddit.com/r/youtubedl/wiki/cookies
 func DownloadPlaylist(playlistUrl string, logger io.Writer) (*Playlist, error) {
-	err := ValidatePlaylistUrl(playlistUrl)
+	err := ValidatePlaylistFeedUrl(playlistUrl)
 	if err != nil {
 		return nil, err
 	}
@@ -153,6 +158,78 @@ func ValidatePlaylistUrl(rawUrl string) error {
 		return errors.New("no playlist id in url")
 	}
 	return nil
+}
+
+func ValidateFeedUrl(rawUrl string) error {
+	url, err := url.Parse(rawUrl)
+	if err != nil {
+		return err
+	}
+	if url.Scheme != "https" {
+		return errors.New("expected https")
+	}
+	if url.Hostname() != "youtube.com" && url.Hostname() != "www.youtube.com" {
+		return errors.New("not a youtube url")
+	}
+	if !strings.HasPrefix(url.Path, "/feed/") {
+		return errors.New("not a feed url")
+	}
+	return nil
+}
+
+func ValidatePlaylistFeedUrl(rawUrl string) error {
+	err1 := ValidatePlaylistUrl(rawUrl)
+	err2 := ValidateFeedUrl(rawUrl)
+	if err1 != nil && err2 != nil {
+		return errors.Join(err1, err2)
+	}
+	return nil
+}
+
+func ValidateVideoUrl(rawUrl string) error {
+	url, err := url.Parse(rawUrl)
+	if err != nil {
+		return err
+	}
+	if url.Scheme != "https" {
+		return errors.New("expected https")
+	}
+	if url.Hostname() != "youtube.com" && url.Hostname() != "www.youtube.com" {
+		return errors.New("not a youtube url")
+	}
+	if url.Path != "/watch" {
+		return errors.New("not a video url")
+	}
+	if !url.Query().Has("v") {
+		return errors.New("no video id in url")
+	}
+	return nil
+}
+
+func VideoUrlId(rawUrl string) (string, error) {
+	if err := ValidateVideoUrl(rawUrl); err != nil {
+		return "", err
+	}
+	url, err := url.Parse(rawUrl)
+	if err != nil {
+		return "", err
+	}
+	return url.Query().Get("v"), nil
+}
+
+// Replace with func that downloads thumbnail
+// that func can just return imageData tbh
+// OR "sixelImage"
+func DownloadThumbnail(thumbnailUrl string) (image.Image, error) {
+	var buf bytes.Buffer
+	if err := requests.
+		URL(thumbnailUrl).
+		ToBytesBuffer(&buf).
+		Fetch(context.Background()); err != nil {
+		return nil, err
+	}
+	img, _, err := image.Decode(&buf)
+	return img, err
 }
 
 func FuzzyFind(query string, videos []Video) []Video {
