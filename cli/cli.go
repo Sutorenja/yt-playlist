@@ -14,7 +14,6 @@ var (
 	quietFlag  = &cli.BoolFlag{Name: "quiet", Aliases: []string{"q"}, Usage: "do not print info to stderr"}
 	limitFlag  = &cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative}
 	formatFlag = &cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"}
-	guiFlag    = &cli.BoolFlag{Name: "gui", Aliases: []string{"g"}, Usage: "launch a gui and browse the result instead of printing it to the terminal"}
 	queryFlag  = &cli.StringFlag{Name: "query", Aliases: []string{"q"}, Usage: "automatically insert query and return results. If not set, opens fzf and you can manually search and select"}
 )
 
@@ -72,7 +71,7 @@ var list = &cli.Command{
 	Name:        "list",
 	Description: "",
 	Usage:       "pls list [sqlite file] [flags...]",
-	Flags:       []cli.Flag{limitFlag, formatFlag, guiFlag},
+	Flags:       []cli.Flag{limitFlag, formatFlag},
 	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 		if !c.Args().Present() {
 			return ctx, fmt.Errorf("need sqlite database file arg")
@@ -98,14 +97,6 @@ var list = &cli.Command{
 			n = int(c.Int("limit"))
 		}
 		videos = videos[0:min(n, len(videos))]
-
-		/*if c.Bool("gui") {
-			 // videos, err = pls.TUI(videos)
-			if err := gui.Run(); err != nil {
-				return err
-			}
-		}*/
-
 		return pls.PrintVideosWithFormat(c.String("format"), videos)
 	},
 }
