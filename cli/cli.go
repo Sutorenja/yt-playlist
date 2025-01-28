@@ -17,7 +17,7 @@ func Run() error {
 var root = &cli.Command{
 	Description: "",
 	Usage:       "",
-	Commands:    []*cli.Command{get, list, has},
+	Commands:    []*cli.Command{get, list, find, has},
 }
 
 var get = &cli.Command{
@@ -64,14 +64,9 @@ var list = &cli.Command{
 	Description: "",
 	Usage:       "pls list [sqlite file] [flags...]",
 	Flags: []cli.Flag{
-		&cli.StringFlag{Name: "query", Aliases: []string{"q"}, Usage: "fuzzy search query"},
 		&cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative},
-		&cli.BoolFlag{Name: "tui", Aliases: []string{"t"}, Usage: "launch a tui and browse the result instead of printing it to stdout"},
-		// the tui does not let you filter or search or anything like that (you do that with the cli flags above)
-
-		// TODO add flags that let you specify output format. Instead of printing URL, we could print video title, channel title etc.
-		// in the mean time, just use a url flag
-		&cli.BoolFlag{Name: "url", Usage: "print video url"},
+		&cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"},
+		// &cli.BoolFlag{Name: "gui", Aliases: []string{"g"}, Usage: "launch a gui and browse the result instead of printing it to the terminal"},
 	},
 	Action: func(ctx context.Context, c *cli.Command) error {
 		args := c.Args()
@@ -93,31 +88,20 @@ var list = &cli.Command{
 			return err
 		}
 
-		if c.IsSet("query") {
-			videos = pls.FuzzyFind(c.String("query"), videos)
-		}
-
 		n := len(videos)
 		if c.IsSet("limit") {
 			n = int(c.Int("limit"))
 		}
 		videos = videos[0:min(n, len(videos))]
 
-		if c.Bool("tui") {
-			videos, err = pls.TUI(videos)
-			if err != nil {
+		/*if c.Bool("gui") {
+			 // videos, err = pls.TUI(videos)
+			if err := gui.Run(); err != nil {
 				return err
 			}
-		}
+		}*/
 
-		for i, video := range videos {
-			if c.Bool("url") {
-				fmt.Println(video.Url())
-				continue
-			}
-			fmt.Printf("%d: %s\n", i+1, video.Title)
-		}
-		return nil
+		return pls.PrintVideosWithFormat(c.String("format"), videos)
 	},
 }
 
@@ -154,6 +138,49 @@ var has = &cli.Command{
 		}
 		fmt.Println("false")
 		return nil
+	},
+}
+
+var find = &cli.Command{
+	Name:        "find",
+	Description: "",
+	Usage:       "pls find [sqlite file] [flags...]",
+	Flags: []cli.Flag{
+		&cli.StringFlag{Name: "query", Aliases: []string{"q"}, Usage: "automatically insert query and return results. If not set, opens fzf and you can manually search and select"},
+		&cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative},
+		&cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"},
+	},
+	Action: func(ctx context.Context, c *cli.Command) error {
+		args := c.Args()
+
+		if !args.Present() {
+			return fmt.Errorf("need sqlite database file arg")
+		}
+
+		// so a problem here is that we can provide literally ANY filename we want afaik
+		// and gorm/sqlite would probably allow it...
+
+		db, err := pls.DB(args.First())
+		if err != nil {
+			return err
+		}
+
+		videos, err := pls.GetAllVideos(db)
+		if err != nil {
+			return err
+		}
+
+		videos, err = pls.FuzzyFind(c.String("query"), videos)
+		if err != nil {
+			return err
+		}
+
+		n := len(videos)
+		if c.IsSet("limit") {
+			n = int(c.Int("limit"))
+		}
+		videos = videos[0:min(n, len(videos))]
+		return pls.PrintVideosWithFormat(c.String("format"), videos)
 	},
 }
 
