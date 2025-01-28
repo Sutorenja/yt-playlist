@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/url"
 	"os/exec"
+	"reflect"
 	"strings"
 	"time"
 
@@ -324,4 +325,77 @@ func (video Video) DurationString() string {
 		return fmt.Sprintf("%02d:%s", hrs, str)
 	}
 	return str
+}
+
+// format example: "{Index}: {Title} {ChannelTitle}"
+// Index, Title, and ChannelTitle are 1:1 names of fields in a struct
+// it takes a struct
+// the stuff inside brackets are the name of fields on the passed in go struct
+func PrettyStructFields(format string, strct any) string {
+	v := reflect.ValueOf(strct)
+	if v.Kind() != reflect.Struct {
+		return "" // TODO return error here
+	}
+
+	fields := DeepFields(strct, false)
+	for _, v := range fields {
+		name := v.Type.Name
+		value := v.Value.String()
+
+		switch v.Value.Kind() {
+		case reflect.Int:
+			value = fmt.Sprintf("%v", v.Value.Int())
+		case reflect.Float32, reflect.Float64:
+			value = fmt.Sprintf("%v", v.Value.Float())
+
+		case reflect.Slice:
+			continue
+		case reflect.Struct:
+			continue
+			// TODO add more types later?
+			// + add support for maps, slices, structs etc. ?
+		}
+		format = strings.ReplaceAll(format, "{"+name+"}", value)
+	}
+	return format
+}
+
+type Field struct {
+	Value reflect.Value
+	Type  reflect.StructField
+}
+
+func DeepFields(strct any, exported bool) []Field {
+	fields := []Field{}
+	ifv := reflect.ValueOf(strct)
+	ift := reflect.TypeOf(strct)
+
+	for i := 0; i < ift.NumField(); i++ {
+		v := ifv.Field(i)
+		t := ift.Field(i)
+
+		// skip if not exported when exported is expected
+		if exported && !t.IsExported() {
+			continue
+		}
+
+		// only call recursively if struct is embedded/anonymous
+		if v.Kind() == reflect.Struct && t.Anonymous {
+			fields = append(fields, DeepFields(v.Interface(), exported)...)
+		} else {
+			fields = append(fields, Field{v, t})
+		}
+	}
+	return fields
+}
+
+func PrintStructFields(strct any) (fields []string) {
+	v := reflect.ValueOf(strct)
+	if v.Kind() != reflect.Struct {
+		return []string{}
+	}
+	for _, v := range DeepFields(strct, true) {
+		fields = append(fields, v.Type.Name)
+	}
+	return fields
 }
