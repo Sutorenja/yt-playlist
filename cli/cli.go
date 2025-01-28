@@ -10,11 +10,20 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
+var (
+	quietFlag  = &cli.BoolFlag{Name: "quiet", Aliases: []string{"q"}, Usage: "do not print info to stderr"}
+	limitFlag  = &cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative}
+	formatFlag = &cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"}
+	guiFlag    = &cli.BoolFlag{Name: "gui", Aliases: []string{"g"}, Usage: "launch a gui and browse the result instead of printing it to the terminal"}
+	queryFlag  = &cli.StringFlag{Name: "query", Aliases: []string{"q"}, Usage: "automatically insert query and return results. If not set, opens fzf and you can manually search and select"}
+)
+
 func Run() error {
 	return root.Run(context.Background(), os.Args)
 }
 
 var root = &cli.Command{
+	Name:        "pls",
 	Description: "",
 	Usage:       "",
 	Commands:    []*cli.Command{get, list, find, has},
@@ -24,9 +33,7 @@ var get = &cli.Command{
 	Name:        "get",
 	Description: "",
 	Usage:       "pls get [youtube playlist url] [flags...]",
-	Flags: []cli.Flag{
-		&cli.BoolFlag{Name: "quiet", Aliases: []string{"q"}, Usage: "do not print info to stderr"},
-	},
+	Flags:       []cli.Flag{quietFlag},
 	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 		if !c.Args().Present() {
 			return ctx, fmt.Errorf("need playlist url arg")
@@ -65,11 +72,7 @@ var list = &cli.Command{
 	Name:        "list",
 	Description: "",
 	Usage:       "pls list [sqlite file] [flags...]",
-	Flags: []cli.Flag{
-		&cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative},
-		&cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"},
-		// &cli.BoolFlag{Name: "gui", Aliases: []string{"g"}, Usage: "launch a gui and browse the result instead of printing it to the terminal"},
-	},
+	Flags:       []cli.Flag{limitFlag, formatFlag, guiFlag},
 	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 		if !c.Args().Present() {
 			return ctx, fmt.Errorf("need sqlite database file arg")
@@ -149,11 +152,7 @@ var find = &cli.Command{
 	Name:        "find",
 	Description: "",
 	Usage:       "pls find [sqlite file] [flags...]",
-	Flags: []cli.Flag{
-		&cli.StringFlag{Name: "query", Aliases: []string{"q"}, Usage: "automatically insert query and return results. If not set, opens fzf and you can manually search and select"},
-		&cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative},
-		&cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"},
-	},
+	Flags:       []cli.Flag{queryFlag, limitFlag, formatFlag},
 	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
 		if !c.Args().Present() {
 			return ctx, fmt.Errorf("need sqlite database file arg")
