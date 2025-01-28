@@ -10,12 +10,10 @@ import (
 	"io"
 	"net/url"
 	"os/exec"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/carlmjohnson/requests"
-	"github.com/lithammer/fuzzysearch/fuzzy"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -232,27 +230,39 @@ func DownloadThumbnail(thumbnailUrl string) (image.Image, error) {
 	return img, err
 }
 
-func FuzzyFind(query string, videos []Video) []Video {
+func FuzzyFind(query string, videos []Video) ([]Video, error) {
 	var words []string
 	var word2video = make(map[string]Video)
 	for _, video := range videos {
-		word := fmt.Sprintf("%s %s", video.ChannelTitle, video.Title)
+		word := fmt.Sprintf("%s - %s", video.ChannelTitle, video.Title)
 		word2video[word] = video
 		words = append(words, word)
 	}
 
-	matches := fuzzy.RankFindNormalizedFold(query, words)
-	sort.Sort(matches)
+	// --layout=reverse
+	// --layout=reverse-list
+	args := []string{"--style=minimal", "--multi", "--cycle"}
+	if query != "" {
+		args = append(args, "--bind=load:toggle-all+accept", fmt.Sprintf("--query=%s", query))
+	}
+
+	cmd := exec.Command("fzf", args...)
+	cmd.Stdin = strings.NewReader(strings.Join(words, "\n"))
+	out, err := cmd.Output()
+	if err != nil {
+		return []Video{}, err
+	}
+	matches := strings.Split(string(out), "\n")
 
 	videos = []Video{}
-	for _, v := range matches {
-		video, ok := word2video[v.Target]
+	for _, word := range matches {
+		video, ok := word2video[word]
 		if !ok {
 			continue
 		}
 		videos = append(videos, video)
 	}
-	return videos
+	return videos, nil
 }
 
 func GetAllVideos(db *gorm.DB) ([]Video, error) {
