@@ -399,3 +399,45 @@ func PrintStructFields(strct any) (fields []string) {
 	}
 	return fields
 }
+
+func PrintVideosWithFormat(format string, videos []Video) error {
+	for i, video := range videos {
+		v := struct {
+			Video
+			Index          int
+			DurationString string
+			Url            string
+			Json           string
+		}{
+			video,
+			i + 1,
+			video.DurationString(),
+			video.Url(),
+			"",
+		}
+
+		b, err := json.Marshal(video)
+		if err != nil {
+			return err
+		}
+		v.Json = string(b)
+
+		fmt.Println(PrettyStructFields(format, v))
+	}
+	return nil
+}
+
+func PrintFormatHelp() {
+	v := struct {
+		Video
+		Index          int
+		DurationString string
+		Url            string
+		Json           string
+	}{}
+
+	strs := PrintStructFields(v)
+	for _, v := range strs {
+		fmt.Printf("- {%s}\n", v)
+	}
+}
