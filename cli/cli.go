@@ -27,13 +27,15 @@ var get = &cli.Command{
 	Flags: []cli.Flag{
 		&cli.BoolFlag{Name: "quiet", Aliases: []string{"q"}, Usage: "do not print info to stderr"},
 	},
-	Action: func(ctx context.Context, c *cli.Command) error {
-		args := c.Args()
-
-		if !args.Present() {
-			return fmt.Errorf("need playlist url arg")
+	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		if !c.Args().Present() {
+			return ctx, fmt.Errorf("need playlist url arg")
 		}
-		if err := pls.ValidatePlaylistFeedUrl(args.First()); err != nil {
+		return ctx, nil
+	},
+	Action: func(ctx context.Context, c *cli.Command) error {
+		url := c.Args().First()
+		if err := pls.ValidatePlaylistFeedUrl(url); err != nil {
 			return fmt.Errorf("not a valid playlist url: %s", err)
 		}
 
@@ -43,7 +45,7 @@ var get = &cli.Command{
 		}
 		writer.Write([]byte(""))
 
-		playlist, err := pls.DownloadPlaylist(args.First(), writer)
+		playlist, err := pls.DownloadPlaylist(url, writer)
 		if err != nil {
 			return err
 		}
@@ -68,17 +70,17 @@ var list = &cli.Command{
 		&cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"},
 		// &cli.BoolFlag{Name: "gui", Aliases: []string{"g"}, Usage: "launch a gui and browse the result instead of printing it to the terminal"},
 	},
-	Action: func(ctx context.Context, c *cli.Command) error {
-		args := c.Args()
-
-		if !args.Present() {
-			return fmt.Errorf("need sqlite database file arg")
+	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		if !c.Args().Present() {
+			return ctx, fmt.Errorf("need sqlite database file arg")
 		}
-
+		return ctx, nil
+	},
+	Action: func(ctx context.Context, c *cli.Command) error {
 		// so a problem here is that we can provide literally ANY filename we want afaik
 		// and gorm/sqlite would probably allow it...
 
-		db, err := pls.DB(args.First())
+		db, err := pls.DB(c.Args().First())
 		if err != nil {
 			return err
 		}
@@ -109,12 +111,14 @@ var has = &cli.Command{
 	Name:        "has",
 	Description: "",
 	Usage:       "pls has [sqlite file] [youtube url]",
+	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		if c.Args().Len() > 2 {
+			return ctx, fmt.Errorf("need sqlite database file arg and url arg")
+		}
+		return ctx, nil
+	},
 	Action: func(ctx context.Context, c *cli.Command) error {
 		args := c.Args()
-
-		if args.Len() > 2 {
-			return fmt.Errorf("need sqlite database file arg and url arg")
-		}
 		if err := pls.ValidateVideoUrl(args.Get(1)); err != nil {
 			return err
 		}
@@ -150,17 +154,17 @@ var find = &cli.Command{
 		&cli.IntFlag{Name: "limit", Aliases: []string{"n"}, Usage: "number of results. Must be a positive integer", Action: NotNegative},
 		&cli.StringFlag{Name: "format", Aliases: []string{"f"}, Usage: "format output", Value: "{Index}: {Title}"},
 	},
-	Action: func(ctx context.Context, c *cli.Command) error {
-		args := c.Args()
-
-		if !args.Present() {
-			return fmt.Errorf("need sqlite database file arg")
+	Before: func(ctx context.Context, c *cli.Command) (context.Context, error) {
+		if !c.Args().Present() {
+			return ctx, fmt.Errorf("need sqlite database file arg")
 		}
-
+		return ctx, nil
+	},
+	Action: func(ctx context.Context, c *cli.Command) error {
 		// so a problem here is that we can provide literally ANY filename we want afaik
 		// and gorm/sqlite would probably allow it...
 
-		db, err := pls.DB(args.First())
+		db, err := pls.DB(c.Args().First())
 		if err != nil {
 			return err
 		}
